@@ -1,3 +1,4 @@
+import argparse
 import csv
 import json
 import sys
@@ -105,7 +106,7 @@ def load_or_fetch(first: str, last: str, folder: Path) -> list[dict] | None:
         return None
 
 
-def plot(players: dict[str, list[dict]], output_path: Path) -> None:
+def plot_png(players: dict[str, list[dict]], output_path: Path) -> None:
     fig, ax = plt.subplots(figsize=(12, 6))
 
     sorted_players = sorted(players.items(), key=lambda x: x[1][-1]["elo"], reverse=True)
@@ -130,13 +131,38 @@ def plot(players: dict[str, list[dict]], output_path: Path) -> None:
     print(f"\nGraph saved to {output_path}")
 
 
-def main():
-    if len(sys.argv) != 3:
-        print("Usage: python shogi_elo.py players.csv output_folder/")
-        sys.exit(1)
+def plot_html(players: dict[str, list[dict]], output_path: Path) -> None:
+    import plotly.graph_objects as go
 
-    csv_path = Path(sys.argv[1])
-    folder = Path(sys.argv[2])
+    sorted_players = sorted(players.items(), key=lambda x: x[1][-1]["elo"], reverse=True)
+
+    fig = go.Figure()
+    for name, history in sorted_players:
+        dates = [e["date"] for e in history]
+        elos = [e["elo"] for e in history]
+        fig.add_trace(go.Scatter(x=dates, y=elos, mode="lines+markers", name=name,
+                                 marker=dict(size=4)))
+
+    fig.update_layout(
+        title="Shogi ELO history",
+        xaxis_title="Date",
+        yaxis_title="ELO rating",
+        hovermode="x unified",
+    )
+
+    fig.write_html(str(output_path))
+    print(f"\nGraph saved to {output_path}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Plot Shogi ELO histories from fesashogi.eu")
+    parser.add_argument("csv", help="CSV file with columns: FirstName, LastName")
+    parser.add_argument("folder", help="Folder for cached JSON data and output graph")
+    parser.add_argument("--html", action="store_true", help="Produce an interactive HTML graph instead of a PNG")
+    args = parser.parse_args()
+
+    csv_path = Path(args.csv)
+    folder = Path(args.folder)
     folder.mkdir(parents=True, exist_ok=True)
 
     players: dict[str, list[dict]] = {}
@@ -158,7 +184,10 @@ def main():
         print("No data to plot.")
         sys.exit(1)
 
-    plot(players, folder / "elo_history.png")
+    if args.html:
+        plot_html(players, folder / "elo_history.html")
+    else:
+        plot_png(players, folder / "elo_history.png")
 
 
 if __name__ == "__main__":
