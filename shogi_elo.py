@@ -23,7 +23,7 @@ def player_url(first: str, last: str) -> str:
 def parse_date(raw: str) -> datetime:
     """Return the last date from a cell that may contain one or two dates."""
     parts = raw.strip().split()
-    # Keep only tokens that look like dates (contain "/" or "-" and have digits)
+    # Keep only tokens that look like dates (contain "-" and have digits)
     date_tokens = [p for p in parts if ("-" in p) and any(c.isdigit() for c in p)]
     last = date_tokens[-1]
     try:
