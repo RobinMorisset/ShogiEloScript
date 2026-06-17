@@ -108,7 +108,9 @@ def load_or_fetch(first: str, last: str, folder: Path) -> list[dict] | None:
 def plot(players: dict[str, list[dict]], output_path: Path) -> None:
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    for name, history in players.items():
+    sorted_players = sorted(players.items(), key=lambda x: x[1][-1]["elo"], reverse=True)
+
+    for name, history in sorted_players:
         dates = [datetime.fromisoformat(e["date"]) for e in history]
         elos = [e["elo"] for e in history]
         ax.plot(dates, elos, marker="o", markersize=3, label=name)
