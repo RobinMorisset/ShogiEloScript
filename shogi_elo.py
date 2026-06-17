@@ -106,12 +106,10 @@ def load_or_fetch(first: str, last: str, folder: Path) -> list[dict] | None:
         return None
 
 
-def plot_png(players: dict[str, list[dict]], output_path: Path) -> None:
+def plot_png(players: list[tuple[str, list[dict]]], output_path: Path) -> None:
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    sorted_players = sorted(players.items(), key=lambda x: x[1][-1]["elo"], reverse=True)
-
-    for name, history in sorted_players:
+    for name, history in players:
         dates = [datetime.fromisoformat(e["date"]) for e in history]
         elos = [e["elo"] for e in history]
         ax.plot(dates, elos, marker="o", markersize=3, label=name)
@@ -131,13 +129,11 @@ def plot_png(players: dict[str, list[dict]], output_path: Path) -> None:
     print(f"\nGraph saved to {output_path}")
 
 
-def plot_html(players: dict[str, list[dict]], output_path: Path) -> None:
+def plot_html(players: list[tuple[str, list[dict]]], output_path: Path) -> None:
     import plotly.graph_objects as go
 
-    sorted_players = sorted(players.items(), key=lambda x: x[1][-1]["elo"], reverse=True)
-
     fig = go.Figure()
-    for name, history in sorted_players:
+    for name, history in players:
         dates = [e["date"] for e in history]
         elos = [e["elo"] for e in history]
         fig.add_trace(go.Scatter(x=dates, y=elos, mode="lines+markers", name=name,
@@ -184,10 +180,12 @@ def main():
         print("No data to plot.")
         sys.exit(1)
 
+    sorted_players = sorted(players.items(), key=lambda x: x[1][-1]["elo"], reverse=True)
+
     if args.html:
-        plot_html(players, folder / "elo_history.html")
+        plot_html(sorted_players, folder / "elo_history.html")
     else:
-        plot_png(players, folder / "elo_history.png")
+        plot_png(sorted_players, folder / "elo_history.png")
 
 
 if __name__ == "__main__":
