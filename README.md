@@ -6,7 +6,7 @@ Fetches ELO rating histories from [fesashogi.eu](https://fesashogi.eu) for a lis
 
 ```bash
 pip install -r requirements.txt
-python shogi_elo.py players.csv data/ [--html]
+python shogi_elo.py players.csv data/ [--html] [--refresh]
 ```
 
 - `players.csv`: two columns, `FirstName,LastName`, one player per row
