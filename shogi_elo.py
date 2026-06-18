@@ -144,8 +144,7 @@ def plot_html(players: list[tuple[str, list[dict]]], output_path: Path) -> None:
     for name, history in players:
         dates = [e["date"] for e in history]
         elos = [e["elo"] for e in history]
-        fig.add_trace(go.Scatter(x=dates, y=elos, mode="lines+markers", name=name,
-                                 marker=dict(size=4)))
+        fig.add_trace(go.Scatter(x=dates, y=elos, mode="lines", name=name))
 
     fig.update_layout(
         title="Shogi ELO history",
