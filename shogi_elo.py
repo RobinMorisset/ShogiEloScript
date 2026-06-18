@@ -120,7 +120,7 @@ def plot_png(players: list[tuple[str, list[dict]]], output_path: Path) -> None:
     for name, history in players:
         dates = [datetime.fromisoformat(e["date"]) for e in history]
         elos = [e["elo"] for e in history]
-        ax.plot(dates, elos, marker="o", markersize=3, label=name)
+        ax.plot(dates, elos, label=name)
 
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
