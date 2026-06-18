@@ -84,25 +84,32 @@ def fetch_player_history(first: str, last: str) -> list[dict]:
     return history
 
 
-def load_or_fetch(first: str, last: str, folder: Path) -> list[dict] | None:
+def load_or_fetch(first: str, last: str, folder: Path, no_history: set[str]) -> list[dict] | None:
+    name = f"{first} {last}"
+
+    if name in no_history:
+        print(f"  Skipping {name} (no history on record)")
+        return None
+
     path = folder / f"{first}_{last}.json"
     if path.exists():
-        print(f"  Loading cached data for {first} {last}")
+        print(f"  Loading cached data for {name}")
         with path.open(encoding="utf-8") as f:
             return json.load(f)
 
-    print(f"  Fetching data for {first} {last} ...")
+    print(f"  Fetching data for {name} ...")
     try:
         history = fetch_player_history(first, last)
         if not history:
-            print(f"  WARNING: no tournament data found for {first} {last}")
+            print(f"  WARNING: no tournament data found for {name}")
+            no_history.add(name)
             return None
         with path.open("w", encoding="utf-8") as f:
             json.dump(history, f, indent=2)
         print(f"  Saved {len(history)} entries to {path.name}")
         return history
     except Exception as e:
-        print(f"  ERROR fetching {first} {last}: {e}")
+        print(f"  ERROR fetching {name}: {e}")
         return None
 
 
@@ -161,6 +168,13 @@ def main():
     folder = Path(args.folder)
     folder.mkdir(parents=True, exist_ok=True)
 
+    no_history_path = folder / "no_history.json"
+    if no_history_path.exists():
+        with no_history_path.open(encoding="utf-8") as f:
+            no_history: set[str] = set(json.load(f))
+    else:
+        no_history = set()
+
     players: dict[str, list[dict]] = {}
 
     with csv_path.open(encoding="utf-8", newline="") as f:
@@ -172,9 +186,12 @@ def main():
             continue
         first = " ".join(w.capitalize() for w in row[0].strip().split())
         last = " ".join(w.capitalize() for w in row[1].strip().split())
-        history = load_or_fetch(first, last, folder)
+        history = load_or_fetch(first, last, folder, no_history)
         if history:
             players[f"{first} {last}"] = history
+
+    with no_history_path.open("w", encoding="utf-8") as f:
+        json.dump(sorted(no_history), f, indent=2)
 
     if not players:
         print("No data to plot.")
