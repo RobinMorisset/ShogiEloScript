@@ -84,15 +84,15 @@ def fetch_player_history(first: str, last: str) -> list[dict]:
     return history
 
 
-def load_or_fetch(first: str, last: str, folder: Path, no_history: set[str]) -> list[dict] | None:
+def load_or_fetch(first: str, last: str, folder: Path, no_history: set[str], refresh: bool = False) -> list[dict] | None:
     name = f"{first} {last}"
 
-    if name in no_history:
+    if not refresh and name in no_history:
         print(f"  Skipping {name} (no history on record)")
         return None
 
     path = folder / f"{first}_{last}.json"
-    if path.exists():
+    if not refresh and path.exists():
         print(f"  Loading cached data for {name}")
         with path.open(encoding="utf-8") as f:
             return json.load(f)
@@ -104,6 +104,7 @@ def load_or_fetch(first: str, last: str, folder: Path, no_history: set[str]) -> 
             print(f"  WARNING: no tournament data found for {name}")
             no_history.add(name)
             return None
+        no_history.discard(name)
         with path.open("w", encoding="utf-8") as f:
             json.dump(history, f, indent=2)
         print(f"  Saved {len(history)} entries to {path.name}")
@@ -162,6 +163,7 @@ def main():
     parser.add_argument("csv", help="CSV file with columns: FirstName, LastName")
     parser.add_argument("folder", help="Folder for cached JSON data and output graph")
     parser.add_argument("--html", action="store_true", help="Produce an interactive HTML graph instead of a PNG")
+    parser.add_argument("--refresh", action="store_true", help="Re-fetch all player data from the server, ignoring the cache")
     args = parser.parse_args()
 
     csv_path = Path(args.csv)
@@ -186,7 +188,7 @@ def main():
             continue
         first = " ".join(w.capitalize() for w in row[0].strip().split())
         last = " ".join(w.capitalize() for w in row[1].strip().split())
-        history = load_or_fetch(first, last, folder, no_history)
+        history = load_or_fetch(first, last, folder, no_history, args.refresh)
         if history:
             players[f"{first} {last}"] = history
 
