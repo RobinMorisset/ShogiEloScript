@@ -3,7 +3,7 @@ import csv
 import json
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 
 import requests
@@ -84,27 +84,33 @@ def fetch_player_history(first: str, last: str) -> list[dict]:
     return history
 
 
-def load_or_fetch(first: str, last: str, folder: Path, no_history: set[str], refresh: bool = False) -> list[dict] | None:
+def load_or_fetch(first: str, last: str, folder: Path, no_history: dict[str, str], refresh_before: date | None) -> list[dict] | None:
     name = f"{first} {last}"
-
-    if not refresh and name in no_history:
-        print(f"  Skipping {name} (no history on record)")
-        return None
+    today = date.today().isoformat()
 
     path = folder / f"{first}_{last}.json"
-    if not refresh and path.exists():
-        print(f"  Loading cached data for {name}")
-        with path.open(encoding="utf-8") as f:
-            return json.load(f)
+
+    if name in no_history:
+        stale = refresh_before is not None and date.fromisoformat(no_history[name]) < refresh_before
+        if not stale:
+            print(f"  Skipping {name} (no history on record)")
+            return None
+
+    if path.exists():
+        stale = refresh_before is not None and date.fromtimestamp(path.stat().st_mtime) < refresh_before
+        if not stale:
+            print(f"  Loading cached data for {name}")
+            with path.open(encoding="utf-8") as f:
+                return json.load(f)
 
     print(f"  Fetching data for {name} ...")
     try:
         history = fetch_player_history(first, last)
         if not history:
             print(f"  WARNING: no tournament data found for {name}")
-            no_history.add(name)
+            no_history[name] = today
             return None
-        no_history.discard(name)
+        no_history.pop(name, None)
         with path.open("w", encoding="utf-8") as f:
             json.dump(history, f, indent=2)
         print(f"  Saved {len(history)} entries to {path.name}")
@@ -162,8 +168,27 @@ def main():
     parser.add_argument("csv", help="CSV file with columns: FirstName, LastName")
     parser.add_argument("folder", help="Folder for cached JSON data and output graph")
     parser.add_argument("--html", action="store_true", help="Produce an interactive HTML graph instead of a PNG")
-    parser.add_argument("--refresh", action="store_true", help="Re-fetch all player data from the server, ignoring the cache")
+    parser.add_argument(
+        "--refresh",
+        nargs="?",
+        const="all",
+        metavar="DATE",
+        help="Re-fetch player data from the server. Without a date, re-fetches all players. "
+             "With a date (YYYY-MM-DD), re-fetches only players last fetched before that date.",
+    )
     args = parser.parse_args()
+
+    refresh_before: date | None
+    if args.refresh is None:
+        refresh_before = None  # no refresh
+    elif args.refresh == "all":
+        refresh_before = date.max  # refresh everything
+    else:
+        try:
+            refresh_before = date.fromisoformat(args.refresh)
+        except ValueError:
+            print(f"ERROR: invalid date '{args.refresh}', expected YYYY-MM-DD")
+            sys.exit(1)
 
     csv_path = Path(args.csv)
     folder = Path(args.folder)
@@ -172,9 +197,14 @@ def main():
     no_history_path = folder / "no_history.json"
     if no_history_path.exists():
         with no_history_path.open(encoding="utf-8") as f:
-            no_history: set[str] = set(json.load(f))
+            raw = json.load(f)
+        # Support old format (list of strings) and new format (dict name -> last_updated)
+        if isinstance(raw, list):
+            no_history: dict[str, str] = {name: "1970-01-01" for name in raw}
+        else:
+            no_history = raw
     else:
-        no_history = set()
+        no_history = {}
 
     players: dict[str, list[dict]] = {}
 
@@ -187,12 +217,12 @@ def main():
             continue
         first = " ".join(w.capitalize() for w in row[0].strip().split())
         last = " ".join(w.capitalize() for w in row[1].strip().split())
-        history = load_or_fetch(first, last, folder, no_history, args.refresh)
+        history = load_or_fetch(first, last, folder, no_history, refresh_before)
         if history:
             players[f"{first} {last}"] = history
 
     with no_history_path.open("w", encoding="utf-8") as f:
-        json.dump(sorted(no_history), f, indent=2)
+        json.dump(dict(sorted(no_history.items())), f, indent=2)
 
     if not players:
         print("No data to plot.")
